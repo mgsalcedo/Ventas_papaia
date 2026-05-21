@@ -101,19 +101,27 @@ def refresh_instagram(account_id: str):
             if isinstance(data, dict):
                 cache.upsert_insights_30d("instagram", data)
 
-    # Daily metrics
+    # Daily metrics — Zernio devuelve {"dailyData": [{"date":..., "metrics":{...}}]}
     dm = _safe("métricas diarias", z.get_daily_metrics, account_id, "instagram")
     if dm:
-        rows = dm.get("data") or dm.get("metrics") or dm.get("daily_metrics") or []
+        rows = dm.get("dailyData") or dm.get("data") or dm.get("metrics") or dm.get("daily_metrics") or []
         if isinstance(dm, list):
             rows = dm
-        if rows:
-            cache.upsert_daily_metrics("instagram", rows)
+        # Aplanar el dict "metrics" anidado que devuelve Zernio
+        flat_rows = []
+        for r in rows:
+            if isinstance(r, dict) and "metrics" in r and isinstance(r["metrics"], dict):
+                flat = {**r, **r["metrics"]}
+            else:
+                flat = r
+            flat_rows.append(flat)
+        if flat_rows:
+            cache.upsert_daily_metrics("instagram", flat_rows)
 
-    # Demographics
+    # Demographics — Zernio devuelve {"demographics": {"age":[...], "city":[...]}}
     demo = _safe("demografía IG", z.get_demographics, account_id)
     if demo:
-        data = demo.get("data") or demo
+        data = demo.get("demographics") or demo.get("data") or demo
         cache.upsert_demographics("instagram", data if isinstance(data, dict) else demo)
 
     # Follower history
@@ -125,10 +133,10 @@ def refresh_instagram(account_id: str):
         if rows:
             cache.upsert_follower_history("instagram", rows)
 
-    # Best time
+    # Best time — Zernio devuelve {"slots": [...]}
     bt = _safe("mejor hora IG", z.get_best_time_to_post, account_id, "instagram")
     if bt:
-        rows = bt.get("data") or bt.get("best_times") or []
+        rows = bt.get("slots") or bt.get("data") or bt.get("best_times") or []
         if isinstance(bt, list):
             rows = bt
         if rows:
@@ -166,23 +174,39 @@ def refresh_instagram(account_id: str):
         if isinstance(comments_resp, list):
             posts_with_comments = comments_resp
 
-        all_comments = []
-        for item in posts_with_comments:
-            if isinstance(item, dict):
-                if "comments" in item:
-                    for c in (item["comments"] or []):
-                        c["post_id"] = item.get("post_id") or item.get("id", "")
-                        all_comments.append(c)
-                elif "text" in item or "message" in item:
-                    all_comments.append(item)
-
-        # Also save posts from the comments endpoint
+        # Save posts first
         posts_data = []
         for item in posts_with_comments:
             if isinstance(item, dict) and ("media_type" in item or "permalink" in item or "thumbnail_url" in item):
                 posts_data.append(item)
         if posts_data:
             cache.upsert_posts("instagram", posts_data)
+
+        # Fetch comments: embedded si los hay, o por post si Zernio devuelve solo commentCount
+        all_comments = []
+        for item in posts_with_comments:
+            if not isinstance(item, dict):
+                continue
+            if "comments" in item:
+                for c in (item["comments"] or []):
+                    c["post_id"] = item.get("post_id") or item.get("id", "")
+                    all_comments.append(c)
+            elif "text" in item or "message" in item:
+                all_comments.append(item)
+            else:
+                comment_count = item.get("commentCount") or item.get("comment_count", 0)
+                if comment_count and comment_count > 0:
+                    post_id = item.get("id") or item.get("post_id", "")
+                    if post_id:
+                        pc = _safe(f"  comments post {str(post_id)[:12]}", z.get_post_comments, post_id, account_id, "instagram")
+                        if pc:
+                            pc_list = pc.get("data") or pc.get("comments") or []
+                            if isinstance(pc, list):
+                                pc_list = pc
+                            for c in pc_list:
+                                if isinstance(c, dict):
+                                    c["post_id"] = post_id
+                                    all_comments.append(c)
 
         if all_comments:
             cache.upsert_comments("instagram", all_comments)
