@@ -301,11 +301,11 @@ def upsert_account_snapshot(platform: str, data: dict):
             VALUES (?,?,?,?,?,?,?,?)
         """, (
             platform,
-            data.get("id") or data.get("account_id") or data.get("_id", ""),
+            data.get("_id") or data.get("id") or data.get("account_id", ""),
             data.get("username", ""),
-            data.get("name") or data.get("display_name", ""),
-            data.get("profile_picture_url") or data.get("profile_pic", ""),
-            data.get("followers_count") or data.get("followers", 0),
+            data.get("displayName") or data.get("name") or data.get("display_name", ""),
+            data.get("profilePicture") or data.get("profile_picture_url") or data.get("profile_pic", ""),
+            data.get("followersCount") or data.get("followers_count") or data.get("followers", 0),
             json.dumps(data),
             datetime.now(timezone.utc).isoformat(),
         ))
@@ -479,13 +479,13 @@ def upsert_posts(platform: str, posts: list[dict]):
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 post_id, platform,
-                p.get("caption", ""),
+                p.get("content") or p.get("caption", ""),
                 p.get("media_type") or p.get("type", ""),
                 p.get("permalink") or p.get("url", ""),
-                p.get("thumbnail_url") or p.get("thumbnail") or p.get("media_url", ""),
-                p.get("timestamp") or p.get("created_at") or p.get("published_at", ""),
-                p.get("like_count") or p.get("likes", 0),
-                p.get("comments_count") or p.get("comments", 0),
+                p.get("picture") or p.get("thumbnail_url") or p.get("thumbnail") or p.get("media_url", ""),
+                p.get("createdTime") or p.get("timestamp") or p.get("created_at") or p.get("published_at", ""),
+                p.get("likeCount") or p.get("like_count") or p.get("likes", 0),
+                p.get("commentCount") or p.get("comments_count") or p.get("comments", 0),
                 p.get("saved") or p.get("saves", 0),
                 p.get("shares", 0),
                 p.get("reach", 0),

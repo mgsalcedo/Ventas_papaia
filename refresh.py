@@ -76,12 +76,30 @@ def refresh_instagram(account_id: str):
     if health:
         cache.upsert_health("instagram", health)
 
-    # Insights 30d
+    # Insights 30d — Zernio devuelve metrics.X.total anidado
     insights = _safe("insights 30 días", z.get_account_insights, account_id)
     if insights:
-        data = insights.get("data") or insights.get("insights") or insights
-        if isinstance(data, dict):
-            cache.upsert_insights_30d("instagram", data)
+        def _tot(d, key):
+            val = d.get(key)
+            return val.get("total", 0) if isinstance(val, dict) else (val or 0)
+
+        metrics_raw = insights.get("metrics", {})
+        if metrics_raw:
+            flat = {
+                "reach":        _tot(metrics_raw, "reach"),
+                "views":        _tot(metrics_raw, "views"),
+                "engaged":      _tot(metrics_raw, "accounts_engaged"),
+                "interactions": _tot(metrics_raw, "total_interactions"),
+                "likes":        _tot(metrics_raw, "likes"),
+                "comments":     _tot(metrics_raw, "comments"),
+                "saves":        _tot(metrics_raw, "saved"),
+                "shares":       _tot(metrics_raw, "shares"),
+            }
+            cache.upsert_insights_30d("instagram", flat)
+        else:
+            data = insights.get("data") or insights.get("insights") or insights
+            if isinstance(data, dict):
+                cache.upsert_insights_30d("instagram", data)
 
     # Daily metrics
     dm = _safe("métricas diarias", z.get_daily_metrics, account_id, "instagram")
