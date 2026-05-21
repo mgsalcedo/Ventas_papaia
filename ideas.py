@@ -12,7 +12,7 @@ import anthropic
 import cache
 from idea_filters import filter_comments, filter_messages
 
-_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "ideas_system.md").read_text()
+_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "ideas_system.md").read_text(encoding="utf-8")
 
 _ID_PATTERN_LONG = re.compile(r"\b(post|comment|message)[\s_-]?id[:\s]*\d+\b", re.IGNORECASE)
 _ID_PATTERN_LABELED = re.compile(r"\b(post|comment|message)\s+\d{10,}\b", re.IGNORECASE)
